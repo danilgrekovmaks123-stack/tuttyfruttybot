@@ -63,8 +63,9 @@ async def main():
                 await asyncio.sleep(2)
                 try:
                     await message.delete()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.error(f"Не удалось удалить команду пользователя: {e}")
+                
                 try:
                     await warning.delete()
                 except Exception:
