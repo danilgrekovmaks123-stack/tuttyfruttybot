@@ -59,7 +59,13 @@ async def main():
         try:
             member = await bot.get_chat_member(chat_id, user_id)
             if member.status not in ["administrator", "creator"]:
-                await message.answer("Эта команда доступна только администраторам.")
+                msg = await message.answer("Эта команда доступна только администраторам.")
+                await asyncio.sleep(2)
+                try:
+                    await message.delete()
+                    await msg.delete()
+                except Exception as e:
+                    logging.error(f"Не удалось удалить сообщения: {e}")
                 return
         except Exception as e:
             logging.error(f"Ошибка при проверке прав: {e}")
