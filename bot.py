@@ -65,11 +65,10 @@ async def main():
                     await message.delete()
                 except Exception as e:
                     logging.error(f"Не удалось удалить команду пользователя: {e}")
-                
                 try:
                     await warning.delete()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.error(f"Не удалось удалить предупреждение: {e}")
                 return
         except Exception as e:
             logging.error(f"Ошибка при проверке прав: {e}")
