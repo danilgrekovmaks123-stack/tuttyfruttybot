@@ -53,6 +53,18 @@ async def main():
 
     @dp.message(Command("tutty"))
     async def cmd_tutty(message: Message, state: FSMContext):
+        # Проверка на администратора
+        user_id = message.from_user.id
+        chat_id = message.chat.id
+        try:
+            member = await bot.get_chat_member(chat_id, user_id)
+            if member.status not in ["administrator", "creator"]:
+                await message.answer("Эта команда доступна только администраторам.")
+                return
+        except Exception as e:
+            logging.error(f"Ошибка при проверке прав: {e}")
+            return
+
         await message.answer("Введите 5 юзернеймов участников (через пробел или с новой строки):\nНапример: @user1 @user2 @user3 @user4 @user5")
         await state.set_state(GiveawayStates.waiting_for_usernames)
 
