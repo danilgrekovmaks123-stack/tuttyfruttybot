@@ -48,11 +48,18 @@ async def main():
             logging.info(f"Удалено сообщение о выходе: {message.left_chat_member.full_name}")
         except Exception as e:
             logging.error(f"Не удалось удалить сообщение: {e}")
+            if "message can't be deleted" in str(e):
+                logging.error("ПОДСКАЗКА: Убедитесь, что бот является АДМИНИСТРАТОРОМ группы и имеет право удалять сообщения.")
 
     # --- Хендлеры для создания розыгрыша (/tutty) ---
 
     @dp.message(Command("tutty"))
     async def cmd_tutty(message: Message, state: FSMContext):
+        # Игнорируем в ЛС
+        if message.chat.type == 'private':
+            await message.answer("Эта команда работает только в группах.")
+            return
+
         # Проверка на администратора
         user_id = message.from_user.id
         chat_id = message.chat.id
@@ -65,6 +72,8 @@ async def main():
                     await message.delete()
                 except Exception as e:
                     logging.error(f"Не удалось удалить команду пользователя: {e}")
+                    if "message can't be deleted" in str(e):
+                        logging.error("ПОДСКАЗКА: Убедитесь, что бот является АДМИНИСТРАТОРОМ группы и имеет право удалять сообщения.")
                 try:
                     await warning.delete()
                 except Exception as e:
