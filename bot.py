@@ -26,6 +26,7 @@ class GiveawayStates(StatesGroup):
     waiting_for_prize = State()
     waiting_for_invite_link = State()
     waiting_for_end_time = State()
+    waiting_for_target_chat = State()
 
 async def main():
     if not TOKEN or TOKEN == "your_telegram_bot_token_here":
@@ -119,13 +120,37 @@ async def main():
 
     @dp.message(GiveawayStates.waiting_for_end_time)
     async def process_end_time(message: Message, state: FSMContext):
+        await state.update_data(end_time=message.text)
+        await message.answer(
+            "Куда отправить опрос?\n\n"
+            "Введите <b>@username</b> канала (например: <code>@tuttifrutty_channel</code>)\n"
+            "Или отправьте <b>-</b> (минус), чтобы опубликовать прямо здесь.\n\n"
+            "<i>❗️ Важно: бот должен быть добавлен в целевой канал как АДМИНИСТРАТОР.</i>",
+            parse_mode="HTML"
+        )
+        await state.set_state(GiveawayStates.waiting_for_target_chat)
+
+    @dp.message(GiveawayStates.waiting_for_target_chat)
+    async def process_target_chat(message: Message, state: FSMContext):
         data = await state.get_data()
-        end_time = message.text
+        target_chat_input = message.text.strip()
+        
+        end_time = data['end_time']
         usernames = data['usernames']
         g_type = data['giveaway_type']
         prize = data['prize']
         invite_link = data['invite_link']
         
+        # Определяем ID чата для отправки
+        if target_chat_input == '-':
+            chat_id_to_send = message.chat.id
+        else:
+            # Если ввели username, проверяем чтобы начинался с @
+            if not target_chat_input.startswith('@') and not target_chat_input.startswith('-100'):
+                chat_id_to_send = '@' + target_chat_input if not target_chat_input.isdigit() else target_chat_input
+            else:
+                chat_id_to_send = target_chat_input
+
         # Сохраняем в БД
         # Сначала создаем запись розыгрыша
         giveaway_id = database.create_giveaway(message.chat.id, prize, invite_link, g_type, end_time)
@@ -142,18 +167,10 @@ async def main():
         ]
         
         # Список участников для текста
-        # В примере: Emoji @username " (кавычки? или просто пусто)
-        # Сделаем красиво
-        # Используем code block или quote для списка, как на скрине
-        # На скрине это выглядит как цитата (вертикальная черта слева)
-        
         participants_text = ""
         for i, u in enumerate(usernames):
             participants_text += f"{EMOJIS[i]} {u}\n"
             
-        # Оборачиваем в цитату (Markdown V2 > или HTML <blockquote>? Aiogram по дефолту HTML или MD?)
-        # По дефолту None, лучше использовать HTML
-        
         text_lines.append("<blockquote>")
         text_lines.append(participants_text.strip())
         text_lines.append("</blockquote>")
@@ -174,7 +191,13 @@ async def main():
         # Клавиатура
         kb = generate_keyboard(giveaway_id)
 
-        await message.answer(full_text, reply_markup=kb, parse_mode="HTML")
+        try:
+            await bot.send_message(chat_id=chat_id_to_send, text=full_text, reply_markup=kb, parse_mode="HTML")
+            if str(chat_id_to_send) != str(message.chat.id):
+                await message.answer(f"✅ Опрос успешно опубликован в {chat_id_to_send}!")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при отправке в {chat_id_to_send}.\nУбедитесь, что бот добавлен туда и имеет права администратора.\nТекст ошибки: {e}")
+
         await state.clear()
 
 
