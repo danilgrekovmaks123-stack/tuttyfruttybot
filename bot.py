@@ -187,23 +187,40 @@ async def main():
         participant_id = int(p_id)
         user_id = callback.from_user.id
 
-        # Проверка на повторное голосование
-        if database.has_user_voted(user_id, giveaway_id):
-            await callback.answer("Вы уже голосовали в этом розыгрыше!", show_alert=True)
-            return
+        # Проверяем текущий голос пользователя
+        voted_participant_id = database.get_user_vote(user_id, giveaway_id)
 
-        # Записываем голос
-        success = database.vote_for_participant(user_id, giveaway_id, participant_id)
-        if success:
-            await callback.answer("Ваш голос учтен!")
-            # Обновляем клавиатуру с новыми цифрами
-            new_kb = generate_keyboard(giveaway_id)
-            try:
-                await callback.message.edit_reply_markup(reply_markup=new_kb)
-            except Exception:
-                pass # Если ничего не изменилось (редкий кейс)
+        if voted_participant_id == participant_id:
+            # Если нажал на того же, снимаем голос
+            success = database.remove_vote(user_id, giveaway_id, participant_id)
+            if success:
+                await callback.answer("Ваш голос отменен!")
+            else:
+                await callback.answer("Ошибка при отмене голоса.", show_alert=True)
+                return
+        elif voted_participant_id is not None:
+            # Если голосовал за другого, меняем голос
+            success = database.change_vote(user_id, giveaway_id, voted_participant_id, participant_id)
+            if success:
+                await callback.answer("Ваш голос изменен!")
+            else:
+                await callback.answer("Ошибка при изменении голоса.", show_alert=True)
+                return
         else:
-            await callback.answer("Ошибка при голосовании.", show_alert=True)
+            # Новый голос
+            success = database.vote_for_participant(user_id, giveaway_id, participant_id)
+            if success:
+                await callback.answer("Ваш голос учтен!")
+            else:
+                await callback.answer("Ошибка при голосовании.", show_alert=True)
+                return
+
+        # Обновляем клавиатуру с новыми цифрами
+        new_kb = generate_keyboard(giveaway_id)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=new_kb)
+        except Exception:
+            pass # Если ничего не изменилось (редкий кейс)
 
     print("Бот запущен...")
     await dp.start_polling(bot)

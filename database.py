@@ -90,13 +90,50 @@ def get_participants(giveaway_id):
     conn.close()
     return rows
 
-def has_user_voted(user_id, giveaway_id):
+def get_user_vote(user_id, giveaway_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT 1 FROM votes WHERE user_id = ? AND giveaway_id = ?', (user_id, giveaway_id))
+    cursor.execute('SELECT participant_id FROM votes WHERE user_id = ? AND giveaway_id = ?', (user_id, giveaway_id))
     result = cursor.fetchone()
     conn.close()
-    return result is not None
+    return result[0] if result else None
+
+def change_vote(user_id, giveaway_id, old_participant_id, new_participant_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE votes SET participant_id = ? 
+            WHERE user_id = ? AND giveaway_id = ?
+        ''', (new_participant_id, user_id, giveaway_id))
+        
+        cursor.execute('UPDATE participants SET votes = votes - 1 WHERE id = ?', (old_participant_id,))
+        cursor.execute('UPDATE participants SET votes = votes + 1 WHERE id = ?', (new_participant_id,))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        logging.error(f"Error changing vote: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def remove_vote(user_id, giveaway_id, participant_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    try:
+        cursor.execute('DELETE FROM votes WHERE user_id = ? AND giveaway_id = ?', (user_id, giveaway_id))
+        cursor.execute('UPDATE participants SET votes = votes - 1 WHERE id = ?', (participant_id,))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        logging.error(f"Error removing vote: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
 
 def vote_for_participant(user_id, giveaway_id, participant_id):
     conn = sqlite3.connect(DB_NAME)
